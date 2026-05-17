@@ -30,6 +30,48 @@ in
 lib.fix (
   self:
   addCoverage types {
+    from = {
+      simple =
+        let type = types.from "0"; in {
+          testValid = { expr = type.verify "0"; expected = null; };
+          testNotValid = { expr = type.verify "1"; expected = "Expected string '\"0\"' but got string '\"1\"'"; };
+        };
+      complex =
+        let type = types.from [ "0" 1 false ]; in {
+          testValid = { expr = type.verify [ "0" 1 false ]; expected = null; };
+          testNotValid = { expr = type.verify [ "0" 1 true ]; expected = "in tuple<0, 1, false>: in element 2: Expected bool 'false' but got bool 'true'"; };
+        };
+    };
+
+    scalar = {
+      int = let type = types.scalar.int 0; in {
+        testValid = { expr = type.verify 0; expected = null; };
+        testNotValid = { expr = type.verify 1; expected = "Expected int '0' but got int '1'"; };
+      };
+      string = let type = types.scalar.string 0; in {
+        testValid = { expr = type.verify 0; expected = null; };
+        testNotValid = { expr = type.verify 1; expected = "Expected string '0' but got int '1'"; };
+      };
+      float = let type = types.scalar.float 0.0; in {
+        testValid = { expr = type.verify 0.0; expected = null; };
+        testNotValid = { expr = type.verify 1.0; expected = "Expected float '0.0' but got float '1.0'"; };
+      };
+    };
+
+    refine =
+      let type = types.refine "GreaterThanFour" types.int (n: n > 4);  in
+      {
+        testValid = { expr = type.verify 5; expected = null; };
+        testNotValid = { expr = type.verify 3; expected = "failed predicate GreaterThanFour"; };
+      };
+
+    refine' =
+      let type = types.refine' "GreaterThanFour" types.int (n: if n > 4 then null else "not greater than four"); in
+      {
+        testValid = { expr = type.verify 5; expected = null; };
+        testNotValid = { expr = type.verify 3; expected = "not greater than four"; };
+      };
+
     string = {
       testInvalid = {
         expr = types.str.verify 1;

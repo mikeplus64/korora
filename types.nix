@@ -76,6 +76,7 @@ let
     elemAt
     length
     genList
+    mapAttrs
     ;
 
   isDerivation = value: isAttrs value && (value.type or null == "derivation");
@@ -85,6 +86,10 @@ let
   joinKeys = list: concatStringsSep ", " (map (e: "'${e}'") list);
 
   toPretty = (import ./lib.nix).toPretty { indent = "  "; };
+
+  concatMapAttrsStringSep =
+    sep: f: attrs:
+    concatStringsSep sep (attrValues (mapAttrs f attrs));
 
   typeError = name: v: "Expected type '${name}' but value '${toPretty v}' is of type '${typeOf v}'";
 
@@ -113,6 +118,15 @@ let
       );
 
   addErrorContext = context: error: if error == null then null else "${context}: ${error}";
+
+  scalarName = {
+    int = toString;
+    bool = v: if v then "true" else "false";
+    string = toString;
+    path = toString;
+    null = toString;
+    float = toString;
+  };
 
   fix =
     f:
@@ -602,6 +616,77 @@ fix (self: {
       else
         withErrorContext (verifyValue v 0)
     );
+
+  /*
+    scalar.int
+    scalar.bool
+    scalar.string
+    scalar.path
+    scalar.null
+    scalar.float
+
+    Attrset of types to check functions (returns bool for success) that a scalar
+    literal matches for that type
+   */
+  scalar = mapAttrs (k: checkFn: type:
+    self.typedef'
+      (scalarName.${k} type)
+      (v: if checkFn type v then null else "Expected ${k} '${toPretty type}' but got ${typeOf v} '${toPretty v}'")
+  ) {
+    int = type: value: type == value;
+    bool = type: value: type == value;
+    string = type: value: type == value;
+    path = type: value: type == value;
+    null = type: value: type == value;
+    float = type: value: type == value;
+  };
+
+  /*
+    from<value>
+
+    Build a type from a literal input
+  */
+  from = value:
+    if value ? name then
+      value
+    else
+      let t = typeOf value; in
+      if self.scalar ? ${t} then
+        self.scalar.${t} value
+      else if t == "lambda" then
+        self.typedef' "lambda" (v: (self.from (value v)).verify)
+      else if t == "set" then
+        let
+          value_ = mapAttrs (_: self.from) value;
+        in
+          self.struct {
+            name = "{${concatMapAttrsStringSep ";" (k: v: "${k}=${v.name}}") value_}";
+            total = true;
+            unknown = false;
+            types = value_;
+          }
+      else if t == "list" then
+        self.tuple (map self.from value)
+      else
+        throw "check: cannot handle ${value} :: ${t}";
+
+  /*
+    refine'<name, T, refinement>
+
+    Create a refinement over a given verify function
+  */
+  refine' =
+    name: T: refinement:
+    self.typedef' name (v:
+      let err1 = T.verify v; in
+      if err1 == null then
+        refinement v
+      else
+        err1);
+  
+  /* Create a refinement over a given check function */
+  refine = name: T: predicate: self.refine' name T
+    (v: if predicate v then null else "failed predicate ${name}");
 
   /*
     Create a wrapped type checked function.
