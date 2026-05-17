@@ -608,6 +608,25 @@ fix (self: {
         self.tuple (map self.from value)
       else
         throw "check: cannot handle ${value} :: ${t}";
+
+  /*
+    refine'<name, T, refinement>
+
+    Create a refinement over a given verify function
+  */
+  refine' =
+    name: T: refinement:
+    self.typedef' name (v:
+      let err1 = T.verify v; in
+      if err1 == null then
+        refinement v
+      else
+        err1);
+  
+  /* Create a refinement over a given check function */
+  refine = name: T: predicate: self.refine' name T
+    (v: if predicate v then null else "failed predicate ${name}");
+
   /*
     Create a wrapped type checked function.
   */

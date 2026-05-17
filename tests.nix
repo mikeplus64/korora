@@ -58,6 +58,20 @@ lib.fix (
       };
     };
 
+    refine =
+      let type = types.refine "GreaterThanFour" types.int (n: n > 4);  in
+      {
+        testValid = { expr = type.verify 5; expected = null; };
+        testNotValid = { expr = type.verify 3; expected = "failed predicate GreaterThanFour"; };
+      };
+
+    refine' =
+      let type = types.refine' "GreaterThanFour" types.int (n: if n > 4 then null else "not greater than four"); in
+      {
+        testValid = { expr = type.verify 5; expected = null; };
+        testNotValid = { expr = type.verify 3; expected = "not greater than four"; };
+      };
+
     string = {
       testInvalid = {
         expr = types.str.verify 1;
