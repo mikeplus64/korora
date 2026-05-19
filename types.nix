@@ -77,6 +77,9 @@ let
     length
     genList
     mapAttrs
+    stringLength
+    match
+    tail
     ;
 
   isDerivation = value: isAttrs value && (value.type or null == "derivation");
@@ -135,6 +138,8 @@ let
     in
     x;
 
+
+  isType = t: t ? __name && isString t;
 in
 fix (self: {
 
@@ -173,7 +178,17 @@ fix (self: {
   /*
     String
   */
-  string = self.typedef "string" isString;
+  string = self.typedef "string" isString // {
+    match = regex: self.refine "/${regex}/" self.string (s: match regex s != null);
+    size = {
+      nonEmpty = self.refine "non-empty" self.string (s: s != "");
+      lt = len: self.refine "length<${toString len}" self.string (s: stringLength s < len);
+      gt = len: self.refine "length>${toString len}" self.string (s: stringLength s > len);
+      lte = len: self.refine "length<${toString len}" self.string (s: stringLength s < len);
+      gte = len: self.refine "length>${toString len}" self.string (s: stringLength s > len);
+      between = a: b: self.refine "${toString a}<=length<=${toString b}" self.string (s: a <= stringLength s && stringLength s <= b);
+    };
+  };
 
   /*
     Type alias for string
@@ -193,17 +208,46 @@ fix (self: {
   /*
     Int
   */
-  int = self.typedef "int" isInt;
+  int = self.typedef "int" isInt // {
+    lt = len: self.refine "int<${toString len}" self.int (s: s < len);
+    gt = len: self.refine "int>${toString len}" self.int (s: s > len);
+    lte = len: self.refine "int<${toString len}" self.int (s: s < len);
+    gte = len: self.refine "int>${toString len}" self.int (s: s > len);
+    between = a: b: self.refine "${toString a}<=int<=${toString b}" self.int (s: a <= s && s <= b);
+    even = self.refine "even" self.int (n: n == (n / 2) * 2);
+    odd = self.refine "odd" self.int (n: n != (n / 2) * 2);
+    positive = self.refine "positive" self.int (n: n > 0);
+    nonNegative = self.refine "nonNegative" self.int (n: n >= 0);
+    negative = self.refine "positive" self.int (n: n < 0);
+  };
 
   /*
     Single precision floating point
   */
-  float = self.typedef "float" isFloat;
+  float = self.typedef "float" isFloat // {
+    lt = len: self.refine "float<${toString len}" self.float (s: s < len);
+    gt = len: self.refine "float>${toString len}" self.float (s: s > len);
+    lte = len: self.refine "float<${toString len}" self.float (s: s < len);
+    gte = len: self.refine "float>${toString len}" self.float (s: s > len);
+    between = a: b: self.refine "${toString a}<=float<=${toString b}" self.float (s: a <= s && s <= b);
+    positive = self.refine "positive" self.float (n: n > 0.0);
+    nonNegative = self.refine "nonNegative" self.float (n: n >= 0.0);
+    negative = self.refine "positive" self.float (n: n < 0.0);
+  };
 
   /*
     Either an int or a float
   */
-  number = self.typedef "number" (v: isInt v || isFloat v);
+  number = self.typedef "number" (v: isInt v || isFloat v) // {
+    lt = len: self.refine "number<${toString len}" self.number (s: s < len);
+    gt = len: self.refine "number>${toString len}" self.number (s: s > len);
+    lte = len: self.refine "number<${toString len}" self.number (s: s < len);
+    gte = len: self.refine "number>${toString len}" self.number (s: s > len);
+    between = a: b: self.refine "${toString a}<=number<=${toString b}" self.number (s: a <= s && s <= b);
+    positive = self.refine "positive" self.number (n: n > 0);
+    nonNegative = self.refine "nonNegative" self.number (n: n >= 0);
+    negative = self.refine "positive" self.number (n: n < 0);
+  };
 
   /*
     Bool
@@ -561,6 +605,37 @@ fix (self: {
       in
       mkStruct' { inherit total unknown verify; };
 
+
+  /*
+    Another interface for defining records
+
+    record<name, types> - strict record; no unknown elements
+    record.partial<name, types> - record which allows missing keys
+    record.extensible<name, types> - record which allows unknown keys
+    record.loose<name, types> - record which allows missing keys and unknown keys
+  */
+  record = {
+    __functor = _: name: types: self.struct {
+      inherit name types;
+      total = true;
+      unknown = false;
+    };
+    partial = name: types: self.struct {
+      inherit name types;
+      total = false;
+      unknown = false;
+    };
+    extensible = name: types: self.struct {
+      inherit name types;
+      total = true;
+      unknown = true;
+    };
+    loose = name: types: self.struct {
+      inherit name types;
+      total = false;
+      unknown = false;
+    };
+  };
   /*
     optionalAttr<t>
   */
@@ -677,16 +752,19 @@ fix (self: {
   */
   refine' =
     name: T: refinement:
-    self.typedef' name (v:
-      let err1 = T.verify v; in
-      if err1 == null then
-        refinement v
-      else
-        err1);
-  
-  /* Create a refinement over a given check function */
-  refine = name: T: predicate: self.refine' name T
-    (v: if predicate v then null else "failed predicate ${name}");
+    self.typedef' name (v: let err1 = T.verify v; in if err1 == null then refinement v else err1);
+
+  /*
+    Create a refinement over a given check function
+  */
+  refine = name: T: predicate:
+    self.refine' name T (v: if predicate v then null else "failed predicate ${name}");
+
+  /*
+    Refuse to accept the given type
+  */
+  omit = T:
+    self.typedef' "omit<${T.name}>" (v: let err = T.verify v; in if err == null then "${T.name} forbidden" else null);
 
   /*
     Create a wrapped type checked function.
