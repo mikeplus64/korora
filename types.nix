@@ -341,6 +341,22 @@ fix (self: {
     );
 
   /*
+    map<k, t>
+  */
+  map =
+    # Attribute value type
+    k: v:
+    let
+      name = "map<${k.name}, ${v.name}>";
+      withErrorContext = addErrorContext "in ${name} value";
+    in
+    self.typedef' name (v:
+      if !isAttrs v then
+        typeError name v
+      else
+        withErrorContext (all' k.verify (attrNames v) && all' v.verify (attrValues v))
+    );
+  /*
     union<types...>
   */
   union =
