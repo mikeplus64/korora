@@ -725,5 +725,58 @@ lib.fix (
           };
         };
     };
+
+    record =
+      let type = types.record "t" { x = types.int; }; in {
+      testOK = {
+        expr = type.verify { x = 0; };
+        expected = null;
+      };
+      testNotOK = {
+        expr = type.check { x = "no"; } null;
+        expectedError.type = "ThrownError";
+      };
+    };
+
+    omit = {
+      simple =
+        let type = types.omit (types.record "aaa" { x = types.int; }); in
+        {
+          testOK = {
+            expr = type.verify 0;
+            expected = null;
+          };
+          test2OK = {
+            expr = type.verify "asdf";
+            expected = null;
+          };
+          test3OK = {
+            expr = type.verify { x = "asdf"; };
+            expected = null;
+          };
+          testNotOK = {
+            expr = type.verify { x = 0; };
+            expected = "aaa forbidden";
+          };
+        };
+
+      complex =
+        let
+          type = types.intersection [
+            (types.record "xint" { x = types.union [ types.int types.str ]; })
+            (types.omit (types.record "xint" { x = types.int; }))
+          ];
+        in
+        {
+          testOK = {
+            expr = type.verify { x = "hello"; };
+            expected = null;
+          };
+          testNotOK = {
+            expr = type.verify { x = 32; };
+            expected = "Expected type 'intersection<xint,omit<xint>>' but value '{\n    x = 32;\n  }' is of type 'set'";
+          };
+        };
+    };
   }
 )
