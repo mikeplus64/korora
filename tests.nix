@@ -652,6 +652,15 @@ lib.fix (
             expectedError.type = "ThrownError";
           };
 
+        testDifferingReturnOk =
+          let
+            fn = types.defun "fn" [ types.str types.int ] types.bool (_: _: true);
+          in
+          {
+            expr = fn "arg1" 2;
+            expected = true;
+          };
+
         testTwoArgsOk =
           let
             fn = types.defun "fn" [ types.str types.int ] types.int (_: _: 2);

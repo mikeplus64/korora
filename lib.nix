@@ -67,59 +67,9 @@ let
     # Regex from https://github.com/NixOS/nix/blob/d048577909e383439c2549e849c5c2f2016c997e/src/libexpr/lexer.l#L91
     if match "[a-zA-Z_][a-zA-Z0-9_'-]*" s != null then s else escapeNixString s;
 
-  /**
-    “right fold” a binary function `op` between successive elements of
-    `list` with `nul` as the starting value, i.e.,
-    `foldr op nul [x_1 x_2 ... x_n] == op x_1 (op x_2 ... (op x_n nul))`.
-
-    # Inputs
-
-    `op`
-
-    : 1\. Function argument
-
-    `nul`
-
-    : 2\. Function argument
-
-    `list`
-
-    : 3\. Function argument
-
-    # Type
-
-    ```
-    foldr :: (a -> b -> b) -> b -> [a] -> b
-    ```
-
-    # Examples
-    :::{.example}
-    ## `lib.lists.foldr` usage example
-
-    ```nix
-    concat = foldr (a: b: a + b) "z"
-    concat [ "a" "b" "c" ]
-    => "abcz"
-    # different types
-    strange = foldr (int: str: toString (int + 1) + str) "a"
-    strange [ 1 2 3 4 ]
-    => "2345a"
-    ```
-
-    :::
-  */
-  foldr =
-    op: nul: list:
-    let
-      len = length list;
-      fold' = n: if n == len then nul else op (elemAt list n) (fold' (n + 1));
-    in
-    fold' 0;
 in
 
 {
-  inherit foldr;
-
   /**
     Pretty print a value, akin to `builtins.trace`.
 

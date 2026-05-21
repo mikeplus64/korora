@@ -75,7 +75,6 @@ let
     foldl'
     elemAt
     length
-    genList
     mapAttrs
     stringLength
     match
@@ -89,7 +88,6 @@ let
 
   lib = import ./lib.nix;
   toPretty = lib.toPretty {indent = "  ";};
-  inherit (lib) foldr;
 
   concatMapAttrsStringSep =
     sep: f: attrs:
