@@ -651,6 +651,15 @@ lib.fix (
             expr = fn "foo";
             expectedError.type = "ThrownError";
           };
+
+        testTwoArgsOk =
+          let
+            fn = types.defun "fn" [ types.str types.int ] types.int (_: _: 2);
+          in
+          {
+            expr = fn "arg1" 2;
+            expected = 2;
+          };
       };
 
     recursiveTypes = {

@@ -79,7 +79,6 @@ let
     mapAttrs
     stringLength
     match
-    tail
     ;
 
   isDerivation = value: isAttrs value && (value.type or null == "derivation");
@@ -88,7 +87,9 @@ let
 
   joinKeys = list: concatStringsSep ", " (map (e: "'${e}'") list);
 
-  toPretty = (import ./lib.nix).toPretty { indent = "  "; };
+  lib = import ./lib.nix;
+  toPretty = lib.toPretty {indent = "  ";};
+  inherit (lib) foldr;
 
   concatMapAttrsStringSep =
     sep: f: attrs:
@@ -789,26 +790,21 @@ fix (self: {
     name: args: T: f:
     let
       errorPrefix = "while calling '${name}'";
-    in
-    foldl'
-      (
-        fun: idx:
-        let
-          type = elemAt args idx;
-        in
-        value:
-        if type.verify value != null then
-          throw "${errorPrefix}: while checking argument ${toString idx}: ${type.verify value}"
+      len = length args;
+      run = idx: partial:
+        if idx < len then
+          arg:
+          let err = (elemAt args idx).verify arg; in
+          if err != null then
+            throw "${errorPrefix}: while checking argument ${toString idx}: ${err}"
+          else
+            run (idx + 1) (partial arg)
         else
-          fun value
-      )
-      (
-        arg:
-        let
-          value = f arg;
-          err = T.verify value;
-        in
-        if err != null then throw "${errorPrefix}: while checking return type: ${err}" else value
-      )
-      (genList (i: i) (length args));
+          let err = T.verify partial; in
+          if err != null then
+            throw "${errorPrefix}: while checking return type: ${err}"
+          else
+            partial;
+    in
+      run 0 f;
 })
